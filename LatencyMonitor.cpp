@@ -28,7 +28,7 @@ void LatencyMonitor2::onLoad() {
     if (!gameWrapper) { cvarManager->log("Critical error: gameWrapper is null."); return; }
     MatchmakingWrapper matchmaking = gameWrapper->GetMatchmakingWrapper();
     if (matchmaking.IsNull()) { cvarManager->log("Critical error: matchmakingWrapper is null."); return; }
-    *mmRegion = RegionToStr(StrToRegion(matchmaking.GetRegionLabel(GetCurrentRegionEnum())));
+    *mmRegion = matchmaking.GetRegionLabel(GetCurrentRegionEnum());
 
     cvarManager->log("Latency Monitor loaded successfully.");
 
