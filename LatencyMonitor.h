@@ -34,6 +34,7 @@ public:
     void CancelQueue();
     void NotifyUser(std::string message);
     std::string GetCurrentRegion();
+    void SetCurrentRegion(std::string region);
     Region StrToRegion(std::string regionLabel);
     std::string RegionToStr(Region region);
     int StrToRegionInt(std::string regionLabel);
