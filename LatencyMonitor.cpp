@@ -16,9 +16,9 @@ void LatencyMonitor2::InitializeWinsock() {
 }
 
 void LatencyMonitor2::onLoad() {
+    if (!pluginActiveCheck) { cvarManager->executeCommand("plugin unload latencymonitor"); return; }
     _globalCvarManager = cvarManager;
     cvarManager->registerCvar("latency_monitor2_enabled", "1", "Enable the plugin").bindTo(pluginActive);
-    if (!pluginActive) { cvarManager->executeCommand("plugin unload latencymonitor"); return; }
     InitializeWinsock();
 
     cvarManager->registerCvar("latency_monitor2_region", "EU", "Your region").bindTo(mmRegion);
@@ -34,18 +34,19 @@ void LatencyMonitor2::onLoad() {
 
     if (pluginActiveCheck()) {
         gameWrapper->HookEvent("Function OnlineGameMatchmaking_X.Searching.StartMatchmaking", [this](...) {
+            if (!pluginActiveCheck) { return; }
             cvarManager->log("Matchmaking has started!");
             CheckLatencyAndCancelQueue();
             });
 
         gameWrapper->HookEvent("Function OnlineGameMatchmaking_X.Searching.EndState", [this](...) {
-            if (!pluginActive) { return; }
-            cvarManager->log("Matchmaking was canceled.");
+            if (!pluginActiveCheck) { return; }
+            cvarManager->log("Matchmaking was canceled");
             });
 
 		gameWrapper->HookEvent("Function OnlineSubsystemSteamworks.OnlineSubsystemSteamworks.IsOriginalAppOwner", [this](...) {
-			if (!pluginActive) { return; }
-			cvarManager->log("IsOriginalAppOwner hooked.");
+			if (!pluginActiveCheck) { return; }
+			cvarManager->log("IsOriginalAppOwner hooked");
 			});
     }
 }
@@ -153,7 +154,7 @@ int LatencyMonitor2::GetPing(const std::string& address) {
 }
 
 void LatencyMonitor2::CancelQueue() {
-    if (!pluginActive) { return; }
+    if (!pluginActiveCheck) { return; }
     MatchmakingWrapper matchmaking = gameWrapper->GetMatchmakingWrapper();
     //std::this_thread::sleep_for(std::chrono::milliseconds(400));
     matchmaking.CancelMatchmaking();
@@ -161,7 +162,7 @@ void LatencyMonitor2::CancelQueue() {
 
 void LatencyMonitor2::NotifyUser(std::string message) {
     _globalCvarManager = cvarManager;
-    if (!pluginActive) { return; }
+    if (!pluginActiveCheck) { return; }
     cvarManager->log(message);
     gameWrapper->Toast("LatencyMonitor", message, "default");
 }
