@@ -114,22 +114,20 @@ void LatencyMonitor2::onUnload() {
 }
 
 int LatencyMonitor2::GetPing(const std::string& address) {
+    // need to implement better logic asap
+    // this is slow asf
     HANDLE icmpHandle = IcmpCreateFile();
     if (icmpHandle == INVALID_HANDLE_VALUE) {
         return -1;
     }
-
     struct sockaddr_in sa {};
     if (inet_pton(AF_INET, address.c_str(), &(sa.sin_addr)) <= 0) {
         IcmpCloseHandle(icmpHandle);
         return -1;
     }
-
-    NotifyUser("ping test");
     char sendData[] = "a";
     DWORD replySize = sizeof(ICMP_ECHO_REPLY) + sizeof(sendData);
     auto replyBuffer = std::make_unique<char[]>(replySize);
-
     DWORD result = IcmpSendEcho(
         icmpHandle,
         sa.sin_addr.S_un.S_addr,
@@ -140,15 +138,12 @@ int LatencyMonitor2::GetPing(const std::string& address) {
         replySize,
 		100
     );
-
     if (result == 0) {
         IcmpCloseHandle(icmpHandle);
         return -1;
     }
-
     auto reply = reinterpret_cast<PICMP_ECHO_REPLY>(replyBuffer.get());
     int latency = reply->RoundTripTime;
-
     IcmpCloseHandle(icmpHandle);
     return latency;
 }
@@ -156,7 +151,6 @@ int LatencyMonitor2::GetPing(const std::string& address) {
 void LatencyMonitor2::CancelQueue() {
     if (!pluginActiveCheck) { return; }
     MatchmakingWrapper matchmaking = gameWrapper->GetMatchmakingWrapper();
-    //std::this_thread::sleep_for(std::chrono::milliseconds(400));
     matchmaking.CancelMatchmaking();
 }
 
@@ -174,6 +168,10 @@ std::string LatencyMonitor2::GetCurrentRegion() {
         return "Unknown";
     }
     return regionCvar.getStringValue();
+}
+
+void LatencyMonitor2::SetCurrentRegion(std::string region) {
+    *mmRegion = region;
 }
 
 Region LatencyMonitor2::StrToRegion(std::string regionLabel) {
