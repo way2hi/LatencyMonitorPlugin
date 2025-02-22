@@ -11,7 +11,7 @@
     <ProjectGuid>{6f707369-6c6e-4954-9206-017d0e8a2979}</ProjectGuid>
     <RootNamespace>TestPlugin</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
-    <ProjectName>LatencyMonitor2</ProjectName>
+    <ProjectName>LatencyMonitor</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">

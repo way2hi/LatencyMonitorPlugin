@@ -15,19 +15,19 @@
 #include "version.h"
 constexpr auto plugin_version = stringify(VERSION_MAJOR) "." stringify(VERSION_MINOR) "." stringify(VERSION_PATCH) "." stringify(VERSION_BUILD);
 
-class LatencyMonitor2 : public BakkesMod::Plugin::BakkesModPlugin, public BakkesMod::Plugin::PluginSettingsWindow
+class LatencyMonitor : public BakkesMod::Plugin::BakkesModPlugin, public BakkesMod::Plugin::PluginSettingsWindow
 {
 public:
 
     std::shared_ptr<bool> pluginActive = std::make_shared<bool>(true);
+    std::shared_ptr<bool> debugMode = std::make_shared<bool>(false);
     std::shared_ptr<int> maxAllowedLatency = std::make_shared<int>(60);
-	std::shared_ptr<std::string> mmRegion = std::make_shared<std::string>("EU");
+    std::shared_ptr<std::string> mmRegion = std::make_shared<std::string>("EU");
 
     void InitializeWinsock();
     void onLoad() override;
-	int pluginActiveCheck();
+    int pluginActiveCheck();
     void onUnload() override;
-    void onQueue();
     void CheckLatencyAndCancelQueue();
     int GetPingFromServerArray(std::string* a, int size);
     int GetPing(const std::string& adr);

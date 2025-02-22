@@ -3,11 +3,13 @@
 #include <chrono>
 #include <thread>
 
-BAKKESMOD_PLUGIN(LatencyMonitor2, "Latency Monitor", plugin_version, PERMISSION_ALL);
+#pragma warning (disable: 28020)
+
+BAKKESMOD_PLUGIN(LatencyMonitor, "Latency Monitor", plugin_version, PERMISSION_ALL);
 
 std::shared_ptr<CVarManagerWrapper> _globalCvarManager;
 
-void LatencyMonitor2::InitializeWinsock() {
+void LatencyMonitor::InitializeWinsock() {
     WSADATA wsaData;
     int result = WSAStartup(MAKEWORD(2, 2), &wsaData);
     if (result != 0) {
@@ -15,14 +17,15 @@ void LatencyMonitor2::InitializeWinsock() {
     }
 }
 
-void LatencyMonitor2::onLoad() {
-    if (!pluginActiveCheck) { cvarManager->executeCommand("plugin unload latencymonitor"); return; }
+void LatencyMonitor::onLoad() {
+    if (!pluginActiveCheck()) { cvarManager->executeCommand("plugin unload latencymonitor"); return; }
     _globalCvarManager = cvarManager;
-    cvarManager->registerCvar("latency_monitor2_enabled", "1", "Enable the plugin").bindTo(pluginActive);
+    cvarManager->registerCvar("lmplugin_enabled", "1", "Enable the plugin").bindTo(pluginActive);
+	cvarManager->registerCvar("lmplugin_debug", "0", "Debug mode").bindTo(debugMode);
     InitializeWinsock();
 
-    cvarManager->registerCvar("latency_monitor2_region", "EU", "Your region").bindTo(mmRegion);
-    cvarManager->registerCvar("latency_monitor2_max_allowed_latency", "60", "Max allowed queue latency").bindTo(maxAllowedLatency);
+    cvarManager->registerCvar("lmplugin_region", "EU", "Your region").bindTo(mmRegion);
+    cvarManager->registerCvar("lmplugin_max_allowed_latency", "60", "Max allowed queue latency").bindTo(maxAllowedLatency);
 
     if (!cvarManager) { cvarManager->log("Critical error: cvarManager is null."); return; }
     if (!gameWrapper) { cvarManager->log("Critical error: gameWrapper is null."); return; }
@@ -34,32 +37,43 @@ void LatencyMonitor2::onLoad() {
 
     if (pluginActiveCheck()) {
         gameWrapper->HookEvent("Function OnlineGameMatchmaking_X.Searching.StartMatchmaking", [this](...) {
-            if (!pluginActiveCheck) { return; }
-            cvarManager->log("Matchmaking has started!");
+            if (!pluginActiveCheck()) { return; }
+
+            if (*debugMode)
+            {
+                NotifyUser("Matchmaking has started!");
+            }
+            
             CheckLatencyAndCancelQueue();
             });
 
         gameWrapper->HookEvent("Function OnlineGameMatchmaking_X.Searching.EndState", [this](...) {
-            if (!pluginActiveCheck) { return; }
-            cvarManager->log("Matchmaking was canceled");
+            if (!pluginActiveCheck()) { return; }
+
+            if (*debugMode)
+            {
+                NotifyUser("Matchmaking was canceled");
+            }
+            
             });
 
-		gameWrapper->HookEvent("Function OnlineSubsystemSteamworks.OnlineSubsystemSteamworks.IsOriginalAppOwner", [this](...) {
-			if (!pluginActiveCheck) { return; }
-			cvarManager->log("IsOriginalAppOwner hooked");
-			});
+        gameWrapper->HookEvent("Function OnlineSubsystemSteamworks.OnlineSubsystemSteamworks.IsOriginalAppOwner", [this](...) {
+            if (!pluginActiveCheck()) { return; }
+            cvarManager->log("IsOriginalAppOwner hooked");
+            });
     }
 }
 
-int LatencyMonitor2::pluginActiveCheck() {
-	return *pluginActive;
+int LatencyMonitor::pluginActiveCheck() {
+    return *pluginActive;
 }
 
-void LatencyMonitor2::CheckLatencyAndCancelQueue() {
-	if (pluginActiveCheck()) {
-        int lat = 0, maxAllowedLatency = cvarManager->getCvar("latency_monitor2_max_allowed_latency").getIntValue();
+void LatencyMonitor::CheckLatencyAndCancelQueue() {
+    if (pluginActiveCheck()) {
+        int lat = 0, maxAllowedLatency = cvarManager->getCvar("lmplugin_max_allowed_latency").getIntValue();
         cvarManager->log("Max allowed latency: " + std::to_string(maxAllowedLatency));
         MatchmakingWrapper matchmaking = gameWrapper->GetMatchmakingWrapper();
+        // need to rework aaaaall of this asap because like it's just horrendous
         std::string servers_EU[] = { "18.175.175.220", "15.188.232.52", "46.182.19.48", "82.96.64.2" };
         std::string servers_USE[] = { "64.233.207.16", "8.26.56.26", "64.6.65.6" };
         std::string servers_USW[] = { "199.85.126.10", "129.250.35.250", "208.67.220.222" };
@@ -71,28 +85,29 @@ void LatencyMonitor2::CheckLatencyAndCancelQueue() {
         int servers_OCE_size = sizeof(servers_OCE) / sizeof(servers_OCE[0]);
         int servers_ASM_size = sizeof(servers_ASM) / sizeof(servers_ASM[0]);
         if (!cvarManager) { return; }
-        if (cvarManager->getCvar("latency_monitor2_region").getStringValue() == "US-East") { lat = GetPingFromServerArray(servers_USE, servers_USE_size); }
-        if (cvarManager->getCvar("latency_monitor2_region").getStringValue() == "US-West") { lat = GetPingFromServerArray(servers_USW, servers_USW_size); }
-        if (cvarManager->getCvar("latency_monitor2_region").getStringValue() == "EU") { lat = GetPingFromServerArray(servers_EU, servers_EU_size); }
-        if (cvarManager->getCvar("latency_monitor2_region").getStringValue() == "Oceania") { lat = GetPingFromServerArray(servers_OCE, servers_OCE_size); }
-        if (cvarManager->getCvar("latency_monitor2_region").getStringValue() == "Asia-Mainland") { lat = GetPingFromServerArray(servers_ASM, servers_ASM_size); }
+        if (*mmRegion == "US-East") { lat = GetPingFromServerArray(servers_USE, servers_USE_size); }
+        if (*mmRegion == "US-West") { lat = GetPingFromServerArray(servers_USW, servers_USW_size); }
+        if (*mmRegion == "EU") { lat = GetPingFromServerArray(servers_EU, servers_EU_size); }
+        if (*mmRegion == "Oceania") { lat = GetPingFromServerArray(servers_OCE, servers_OCE_size); }
+        if (*mmRegion == "Asia-Mainland") { lat = GetPingFromServerArray(servers_ASM, servers_ASM_size); }
         if (lat == -1) {
             CancelQueue();
-            NotifyUser("Queue canceled due to high latency (ping failed).");
             return;
         }
         if (lat > maxAllowedLatency) {
             CancelQueue();
-            NotifyUser("Queue canceled due to high latency (" + std::to_string(lat) + "ms).");
+			if (*debugMode)
+                NotifyUser("Queue canceled due to high latency (" + std::to_string(lat) + "ms).");
         }
         else {
-            NotifyUser("Acceptable latency (" + std::to_string(lat) + "ms).");
+			if (*debugMode)
+                NotifyUser("Acceptable latency (" + std::to_string(lat) + "ms).");
         }
-	}
-    
+    }
+
 }
 
-int LatencyMonitor2::GetPingFromServerArray(std::string* a, int size) {
+int LatencyMonitor::GetPingFromServerArray(std::string* a, int size) {
     int ping = 0;
     for (int i = 0; i < size; i++) {
         ping += GetPing(a[i]);
@@ -100,22 +115,22 @@ int LatencyMonitor2::GetPingFromServerArray(std::string* a, int size) {
     return ping / size;
 }
 
-void LatencyMonitor2::onUnload() {
+void LatencyMonitor::onUnload() {
     cvarManager->executeCommand("writeconfig", true);
     gameWrapper->UnregisterDrawables();
     gameWrapper->UnhookEvent("Function OnlineGameMatchmaking_X.Searching.StartMatchmaking");
     gameWrapper->UnhookEvent("Function OnlineGameMatchmaking_X.Searching.EndState");
     gameWrapper->UnhookEvent("Function OnlineSubsystemSteamworks.OnlineSubsystemSteamworks.IsOriginalAppOwner");
     WSACleanup();
-    cvarManager->removeCvar("latency_monitor2_enabled");
-    cvarManager->removeCvar("latency_monitor2_region");
-    cvarManager->removeCvar("latency_monitor2_max_allowed_latency");
+    cvarManager->removeCvar("lmplugin_enabled");
+    cvarManager->removeCvar("lmplugin_region");
+    cvarManager->removeCvar("lmplugin_max_allowed_latency");
+	cvarManager->removeCvar("lmplugin_debug");
     cvarManager->log("Latency Monitor unloaded.");
 }
 
-int LatencyMonitor2::GetPing(const std::string& address) {
-    // need to implement better logic asap
-    // this is slow asf
+int LatencyMonitor::GetPing(const std::string& address) {
+    // need to implement better logic asap this is causing freezing ingame
     HANDLE icmpHandle = IcmpCreateFile();
     if (icmpHandle == INVALID_HANDLE_VALUE) {
         return -1;
@@ -136,7 +151,7 @@ int LatencyMonitor2::GetPing(const std::string& address) {
         NULL,
         replyBuffer.get(),
         replySize,
-		100
+        100
     );
     if (result == 0) {
         IcmpCloseHandle(icmpHandle);
@@ -144,25 +159,30 @@ int LatencyMonitor2::GetPing(const std::string& address) {
     }
     auto reply = reinterpret_cast<PICMP_ECHO_REPLY>(replyBuffer.get());
     int latency = reply->RoundTripTime;
+    if (latency == 0)
+    {
+        IcmpCloseHandle(icmpHandle);
+        return -1;
+    }
     IcmpCloseHandle(icmpHandle);
     return latency;
 }
 
-void LatencyMonitor2::CancelQueue() {
-    if (!pluginActiveCheck) { return; }
+void LatencyMonitor::CancelQueue() {
+    if (!pluginActiveCheck()) { return; }
     MatchmakingWrapper matchmaking = gameWrapper->GetMatchmakingWrapper();
     matchmaking.CancelMatchmaking();
 }
 
-void LatencyMonitor2::NotifyUser(std::string message) {
+void LatencyMonitor::NotifyUser(std::string message) {
     _globalCvarManager = cvarManager;
-    if (!pluginActiveCheck) { return; }
+    if (!pluginActiveCheck()) { return; }
     cvarManager->log(message);
     gameWrapper->Toast("LatencyMonitor", message, "default");
 }
 
-std::string LatencyMonitor2::GetCurrentRegion() {
-    auto regionCvar = cvarManager->getCvar("latency_monitor2_region");
+std::string LatencyMonitor::GetCurrentRegion() {
+    auto regionCvar = cvarManager->getCvar("lmplugin_region");
     if (!regionCvar) {
         NotifyUser("Region detection failed. Please set your region manually.");
         return "Unknown";
@@ -170,11 +190,13 @@ std::string LatencyMonitor2::GetCurrentRegion() {
     return regionCvar.getStringValue();
 }
 
-void LatencyMonitor2::SetCurrentRegion(std::string region) {
+void LatencyMonitor::SetCurrentRegion(std::string region) {
     *mmRegion = region;
 }
 
-Region LatencyMonitor2::StrToRegion(std::string regionLabel) {
+// these functions can stay i guess theyre just hanging out
+
+Region LatencyMonitor::StrToRegion(std::string regionLabel) {
     if (regionLabel == "US-East") return Region::USE;
     if (regionLabel == "US-West") return Region::USW;
     if (regionLabel == "EU") return Region::EU;
@@ -186,7 +208,7 @@ Region LatencyMonitor2::StrToRegion(std::string regionLabel) {
     return Region::EU;
 }
 
-std::string LatencyMonitor2::RegionToStr(Region region) {
+std::string LatencyMonitor::RegionToStr(Region region) {
     switch (region) {
     case Region::USE: return "US-East";
     case Region::USW: return "US-West";
@@ -200,7 +222,7 @@ std::string LatencyMonitor2::RegionToStr(Region region) {
     }
 }
 
-int LatencyMonitor2::StrToRegionInt(std::string regionLabel) {
+int LatencyMonitor::StrToRegionInt(std::string regionLabel) {
     if (regionLabel == "US-East") return 0; // USE
     if (regionLabel == "US-West") return 1; // USW
     if (regionLabel == "EU") return 2; // EU
@@ -212,7 +234,7 @@ int LatencyMonitor2::StrToRegionInt(std::string regionLabel) {
     return 1; // EU
 }
 
-Region LatencyMonitor2::GetCurrentRegionEnum() {
+Region LatencyMonitor::GetCurrentRegionEnum() {
     std::string regionStr = GetCurrentRegion();
     return StrToRegion(regionStr);
 }
