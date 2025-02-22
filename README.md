@@ -1,2 +1,2 @@
 # LatencyMonitorPlugin
-A BakkesMod plugin
+A (bad) BakkesMod plugin
